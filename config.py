@@ -13,8 +13,8 @@ class Config:
 
     seed = 0
 
-    # model type could be set to : 'snn_delays' |  'snn_delays_lr0' |  'snn' | 'snn_delays_dale'
-    model_type = 'snn_delays_dale'          
+    # model type could be set to : 'snn_delays' |  'snn_delays_lr0' |  'snn' | 'snn_delays_dale | 'snn_dale'
+    model_type = 'snn_dale'          
     
 
     time_step = 10
@@ -38,6 +38,7 @@ class Config:
     n_hidden_neurons = 256 
     n_outputs = 20 if dataset == 'shd' else 35
 
+    exc_proportion = 0.8
     sparsity_p = 0
 
     dropout_p = 0.4

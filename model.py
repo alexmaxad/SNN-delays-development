@@ -27,7 +27,7 @@ class Model(nn.Module):
         self.init_model()
 
         self.init_pos = []
-        if self.config.model_type != 'snn':
+        if self.config.model_type != 'snn' and self.config.model_type != 'snn_dale':
             for i in range(len(self.blocks)):
                 self.init_pos.append(np.copy(self.blocks[i][0][0].P.cpu().detach().numpy()))
 
@@ -38,7 +38,7 @@ class Model(nn.Module):
         ##################################
         optimizers_return = []
 
-        if self.config.model_type in ['snn_delays', 'snn_delays_lr0', 'snn', 'snn_delays_dale']:
+        if self.config.model_type in ['snn_delays', 'snn_delays_lr0', 'snn', 'snn_delays_dale', 'snn_dale']:
             if self.config.optimizer_w == 'adam':
                 optimizers_return.append(optim.Adam([{'params':self.weights, 'lr':self.config.lr_w, 'weight_decay':self.config.weight_decay},
                                                      {'params':self.weights_plif, 'lr':self.config.lr_w, 'weight_decay':self.config.weight_decay},
@@ -62,7 +62,7 @@ class Model(nn.Module):
         ##################################
         schedulers_return = []
 
-        if self.config.model_type in ['snn_delays', 'snn_delays_lr0','snn', 'snn_delays_dale']:
+        if self.config.model_type in ['snn_delays', 'snn_delays_lr0','snn', 'snn_delays_dale', 'snn_dale']:
             if self.config.scheduler_w == 'one_cycle':
                 schedulers_return.append(torch.optim.lr_scheduler.OneCycleLR(optimizers[0], max_lr=self.config.max_lr_w,
                                                                              total_steps=self.config.epochs))

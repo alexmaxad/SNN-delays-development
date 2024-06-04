@@ -2,8 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from spikingjelly.activation_based import neuron, layer
-from spikingjelly.activation_based import functional
+from spikingjelly.spikingjelly.activation_based import neuron, layer
+from spikingjelly.spikingjelly.activation_based import functional
 
 from model import Model
 from utils import set_seed

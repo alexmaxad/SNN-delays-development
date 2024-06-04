@@ -1,4 +1,4 @@
-from spikingjelly.activation_based import surrogate
+from spikingjelly.spikingjelly.activation_based import surrogate
 
 class Config:
     
@@ -13,14 +13,14 @@ class Config:
 
     seed = 0
 
-    # model type could be set to : 'snn_delays' |  'snn_delays_lr0' |  'snn'
-    model_type = 'snn_delays'          
+    # model type could be set to : 'snn_delays' |  'snn_delays_lr0' |  'snn' | 'snn_delays_dale'
+    model_type = 'snn_delays_dale'          
     
 
     time_step = 10
     n_bins = 5
 
-    epochs = 150
+    epochs = 2
     batch_size = 256
 
     ################################################
@@ -138,11 +138,11 @@ class Config:
     #############################################
     # If use_wand is set to True, specify your wandb api token in wandb_token and the project and run names. 
 
-    use_wandb = False
-    wandb_token = 'your_wandb_token'
-    wandb_project_name = 'Wandb Project Name'
+    use_wandb = True
+    wandb_token = '675792ed1b1f46b8bc1badfed325d50c06fce9ba'
+    wandb_project_name = 'tests'
 
-    run_name = 'Wandb Run Name'
+    run_name = 'Run test 00'
 
 
     run_info = f'||{model_type}||{dataset}||{time_step}ms||bins={n_bins}'

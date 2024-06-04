@@ -1,6 +1,7 @@
 from datasets import SHD_dataloaders, SSC_dataloaders, GSC_dataloaders
 from config import Config
 from snn_delays import SnnDelays
+from snn_delays_daleian import SnnDelays_Dale
 import torch
 from snn import SNN
 import utils
@@ -12,6 +13,8 @@ config = Config()
 
 if config.model_type == 'snn':
     model = SNN(config).to(device)
+if config.model_type == 'snn_delays_dale':
+    model = SnnDelays_Dale(config).to(device)
 else:
     model = SnnDelays(config).to(device)
 

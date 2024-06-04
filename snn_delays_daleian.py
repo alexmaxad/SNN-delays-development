@@ -11,7 +11,7 @@ from model import Model
 from utils import set_seed
 
 
-class SnnDelays(Model):
+class SnnDelays_Dale(Model):
     def __init__(self, config):
         super().__init__(config)
 
@@ -127,11 +127,38 @@ class SnnDelays(Model):
         set_seed(self.config.seed)
         self.mask = []
 
+        self.excitatory_mask = []
+        self.inhibitory_mask = []
+        
+        #torch.rand(self.config.n_hidden_neurons, self.config.n_hidden_layers) > 0.2
+        #self.inhibitory_mask = ~self.excitatory_mask
+
         if self.config.init_w_method == 'kaiming_uniform':
             for i in range(self.config.n_hidden_layers+1):
+                    
+                layer_weights = self.blocks[i][0][0].weight.clone()
+
                 # can you replace with self.weights ?
-                torch.nn.init.kaiming_uniform_(self.blocks[i][0][0].weight, nonlinearity='relu')
-                
+                #torch.nn.init.kaiming_uniform_(self.blocks[i][0][0].weight, nonlinearity='relu')
+
+                size_out, size_in = layer_weights.squeeze().size()
+
+                mask = torch.rand(size_out) > 0.2
+
+                self.excitatory_mask.append(mask)
+                self.inhibitory_mask.append(~mask)
+
+                print(f"la taille size_out est {size_out}, la taille size_in est {size_in}, la taille du mask est {self.excitatory_mask[i].size()}, et taille des poids de la couche est { layer_weights.size()}")
+
+                torch.nn.init.kaiming_uniform_(layer_weights[self.excitatory_mask[i], :], nonlinearity='relu')
+                torch.nn.init.kaiming_uniform_(layer_weights[self.inhibitory_mask[i], :], nonlinearity='relu')
+
+                layer_weights[self.excitatory_mask[i], :] = torch.abs(layer_weights[self.excitatory_mask[i], :])
+                layer_weights[self.inhibitory_mask[i], :] = -torch.abs(layer_weights[self.inhibitory_mask[i], :])
+                    
+                with torch.no_grad():
+                    self.blocks[i][0][0].weight.copy_(layer_weights)
+
                 if self.config.sparsity_p > 0:
                     with torch.no_grad():
                         self.mask.append(torch.rand(self.blocks[i][0][0].weight.size()).to(self.blocks[i][0][0].weight.device))
@@ -169,6 +196,15 @@ class SnnDelays(Model):
                     self.mask[i] = self.mask[i].to(self.blocks[i][0][0].weight.device)
                     #self.blocks[i][0][0].weight = torch.nn.Parameter(self.blocks[i][0][0].weight * self.mask[i])
                     self.blocks[i][0][0].weight *= self.mask[i]
+
+            with torch.no_grad():
+                layer_weights = self.blocks[i][0][0].weight.clone()
+
+                layer_weights[self.excitatory_mask[i], :] = torch.abs(layer_weights[self.excitatory_mask[i], :])
+                layer_weights[self.inhibitory_mask[i], :] = -torch.abs(layer_weights[self.inhibitory_mask[i], :])
+
+                with torch.no_grad():
+                    self.blocks[i][0][0].weight.copy_(layer_weights)
 
         # We use clamp_parameters of the Dcls1d modules
         if train: 

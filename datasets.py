@@ -8,9 +8,9 @@ from typing import Callable, Optional
 
 import torchvision.transforms as transforms
 
-from spikingjelly.datasets.shd import SpikingHeidelbergDigits
-from spikingjelly.datasets.shd import SpikingSpeechCommands
-from spikingjelly.datasets import pad_sequence_collate
+from spikingjelly.spikingjelly.datasets.shd import SpikingHeidelbergDigits
+from spikingjelly.spikingjelly.datasets.shd import SpikingSpeechCommands
+from spikingjelly.spikingjelly.datasets import pad_sequence_collate
 
 import torch
 import torchaudio

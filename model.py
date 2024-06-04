@@ -19,6 +19,8 @@ class Model(nn.Module):
     def __init__(self, config):
         super().__init__()
 
+        print('je suis là')
+
         self.config = config
 
         self.build_model()
@@ -36,12 +38,12 @@ class Model(nn.Module):
         ##################################
         optimizers_return = []
 
-        if self.config.model_type in ['snn_delays', 'snn_delays_lr0', 'snn']:
+        if self.config.model_type in ['snn_delays', 'snn_delays_lr0', 'snn', 'snn_delays_dale']:
             if self.config.optimizer_w == 'adam':
                 optimizers_return.append(optim.Adam([{'params':self.weights, 'lr':self.config.lr_w, 'weight_decay':self.config.weight_decay},
                                                      {'params':self.weights_plif, 'lr':self.config.lr_w, 'weight_decay':self.config.weight_decay},
                                                      {'params':self.weights_bn, 'lr':self.config.lr_w, 'weight_decay':0}]))
-            if self.config.model_type == 'snn_delays':
+            if self.config.model_type in ['snn_delays', 'snn_delays_dale']:
                 if self.config.optimizer_pos == 'adam':
                     optimizers_return.append(optim.Adam(self.positions, lr = self.config.lr_pos, weight_decay=0))
         elif self.config.model_type == 'ann':
@@ -60,7 +62,7 @@ class Model(nn.Module):
         ##################################
         schedulers_return = []
 
-        if self.config.model_type in ['snn_delays', 'snn_delays_lr0','snn']:
+        if self.config.model_type in ['snn_delays', 'snn_delays_lr0','snn', 'snn_delays_dale']:
             if self.config.scheduler_w == 'one_cycle':
                 schedulers_return.append(torch.optim.lr_scheduler.OneCycleLR(optimizers[0], max_lr=self.config.max_lr_w,
                                                                              total_steps=self.config.epochs))
@@ -68,7 +70,7 @@ class Model(nn.Module):
                 schedulers_return.append(torch.optim.lr_scheduler.CosineAnnealingLR(optimizers[0],
                                                                                         T_max = self.config.t_max_w))
 
-            if self.config.model_type == 'snn_delays':
+            if self.config.model_type in ['snn_delays', 'snn_delays_dale']:
                 if self.config.scheduler_pos == 'one_cycle':
                     schedulers_return.append(torch.optim.lr_scheduler.OneCycleLR(optimizers[1], max_lr=self.config.max_lr_pos,
                                                                                 total_steps=self.config.epochs))
@@ -235,7 +237,7 @@ class Model(nn.Module):
 
                 self.reset_model(train=True)
 
-                if self.config.use_wandb and self.config.model_type == 'snn_delays':
+                if self.config.use_wandb and self.config.model_type in ['snn_delays', 'snn_delays_dale']:
                     wandb_pos_log = {}
                     for b in range(len(self.blocks)):
                         curr_pos = self.blocks[b][0][0].P.cpu().detach().numpy()
@@ -247,7 +249,7 @@ class Model(nn.Module):
                     batch_count += 1
 
 
-            if self.config.model_type == 'snn_delays':
+            if self.config.model_type in ['snn_delays', 'snn_delays_dale']:
                 pos_logs = {}
                 for b in range(len(self.blocks)):
                     pos_logs[f'dpos{b}_epoch'] = np.abs(pre_pos[b] - pre_pos_epoch[b]).mean()
@@ -298,7 +300,7 @@ class Model(nn.Module):
             if self.config.use_wandb:
 
                 lr_w = schedulers[0].get_last_lr()[0] if self.config.scheduler_w != 'none' else self.config.lr_w
-                lr_pos = schedulers[1].get_last_lr()[0] if self.config.model_type == 'snn_delays' and self.config.scheduler_pos != 'none' else self.config.lr_pos
+                lr_pos = schedulers[1].get_last_lr()[0] if self.config.model_type in ['snn_delays', 'snn_delays_dale'] and self.config.scheduler_pos != 'none' else self.config.lr_pos
 
                 wandb_logs = {"Epoch":epoch,
                               "loss_train":loss_epochs['train'][-1],
@@ -315,7 +317,7 @@ class Model(nn.Module):
 
                 wandb_logs.update(model_logs)
 
-                if self.config.model_type == 'snn_delays':
+                if self.config.model_type in ['snn_delays', 'snn_delays_dale']:
                     wandb_logs.update(pos_logs)
 
                 wandb.log(wandb_logs)

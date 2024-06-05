@@ -19,8 +19,6 @@ class Model(nn.Module):
     def __init__(self, config):
         super().__init__()
 
-        print('je suis là')
-
         self.config = config
 
         self.build_model()
@@ -349,7 +347,7 @@ class Model(nn.Module):
         self.eval()
         with torch.no_grad():
 
-            if self.config.model_type != 'snn':
+            if self.config.model_type != 'snn' and self.config.model_type != 'snn_dale':
                 for i in range(len(self.blocks)):
                     self.blocks[i][0][0].SIG *= 0
                     self.blocks[i][0][0].version = 'max'
@@ -374,7 +372,7 @@ class Model(nn.Module):
 
                 self.reset_model(train=False)
 
-            if self.config.DCLSversion == 'gauss' and self.config.model_type != 'snn':
+            if self.config.DCLSversion == 'gauss' and self.config.model_type != 'snn' and self.config.model_type != 'snn_dale':
                 for i in range(len(self.blocks)):
                     self.blocks[i][0][0].version = 'gauss'
                     self.blocks[i][0][0].DCK.version = 'gauss'

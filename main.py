@@ -40,5 +40,5 @@ elif config.dataset == 'gsc':
 else:
     raise Exception(f'dataset {config.dataset} not implemented')
 
-
-model.train_model(train_loader, valid_loader, test_loader, device)
+if __name__ == '__main__':
+    model.train_model(train_loader, valid_loader, test_loader, device)

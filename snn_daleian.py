@@ -93,12 +93,16 @@ class SNN_Dale(Model):
         #print(self.model)
 
         self.positions = []
-        self.weights = []
+        self.weights_exc = []
+        self.weights_inh = []
+        '''self.weights = []'''
         self.weights_bn = []
         self.weights_plif = []
         for m in self.model.modules():
-            if isinstance(m, layer.Linear):
-                self.weights.append(m.weight)
+            if isinstance(m, DaleLinear):
+                self.weights_exc.append(m.w_exc)
+                self.weights_inh.append(m.w_inh)
+                '''self.weights.append(m.weight)'''
                 if self.config.bias:
                     self.weights_bn.append(m.bias)
             elif isinstance(m, layer.BatchNorm1d):

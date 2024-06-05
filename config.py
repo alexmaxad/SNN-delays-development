@@ -20,7 +20,7 @@ class Config:
     time_step = 10
     n_bins = 5
 
-    epochs = 2
+    epochs = 5
     batch_size = 256
 
     ################################################
@@ -64,7 +64,7 @@ class Config:
     optimizer_w = 'adam'
     optimizer_pos = 'adam'
 
-    weight_decay = 1e-5
+    weight_decay = 1e-4
 
     lr_w = 1e-3
     lr_pos = 100*lr_w   if model_type =='snn_delays' else 0

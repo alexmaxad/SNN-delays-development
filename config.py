@@ -20,7 +20,7 @@ class Config:
     time_step = 10
     n_bins = 5
 
-    epochs = 5
+    epochs = 20
     batch_size = 256
 
     ################################################

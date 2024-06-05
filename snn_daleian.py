@@ -95,14 +95,12 @@ class SNN_Dale(Model):
         self.positions = []
         self.weights_exc = []
         self.weights_inh = []
-        '''self.weights = []'''
         self.weights_bn = []
         self.weights_plif = []
         for m in self.model.modules():
             if isinstance(m, DaleLinear):
                 self.weights_exc.append(m.w_exc)
                 self.weights_inh.append(m.w_inh)
-                '''self.weights.append(m.weight)'''
                 if self.config.bias:
                     self.weights_bn.append(m.bias)
             elif isinstance(m, layer.BatchNorm1d):
@@ -195,10 +193,14 @@ class SNN_Dale(Model):
                 tau_s = self.blocks[i][1][2].tau if not self.config.stateful_synapse_learnable else  1. / self.blocks[i][1][2].w.sigmoid()
             else: tau_s = 0
             
-            w = torch.abs(self.blocks[i][0][0].weight).mean()
+            '''w = torch.abs(self.blocks[i][0][0].weight).mean()'''
+            w_m_exc = torch.abs(self.blocks[i][0][0].w_exc).mean()
+            w_m_inh = torch.abs(self.blocks[i][0][0].w_inh).mean()
 
             model_logs.update({f'tau_m_{i}':tau_m*self.config.time_step, 
-                               f'tau_s_{i}':tau_s*self.config.time_step, 
-                               f'w_{i}':w})
+                               f'tau_s_{i}':tau_s*self.config.time_step,
+                               f'w_exc_{i}':w_m_exc,
+                               f'w_inh_{i}':w_m_inh})
+                               #'''f'w_{i}':w}'''
 
         return model_logs

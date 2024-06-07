@@ -13,8 +13,8 @@ class Config:
 
     seed = 0
 
-    # model type could be set to : 'snn_delays' |  'snn_delays_lr0' |  'snn' | 'snn_delays_dale | 'snn_dale'
-    model_type = 'snn_dale'          
+    # model type could be set to : 'snn_delays' |  'snn_delays_lr0' |  'snn' | 'snn_delays_dale | 'snn_dale' | 'snn_semi_DANN'
+    model_type = 'snn_semi_DANN'          
     
 
     time_step = 10
@@ -68,6 +68,9 @@ class Config:
 
     lr_w = 1e-3
     lr_pos = 100*lr_w   if model_type =='snn_delays' else 0
+
+    '''lr_w_exc = 1e-3
+    lr_w_inh = 1e-2'''
     
     # 'one_cycle', 'cosine_a', 'none'
     scheduler_w = 'one_cycle'    
@@ -146,7 +149,7 @@ class Config:
     run_name = 'Run test 00'
 
 
-    run_info = f'||{model_type}||{dataset}||{time_step}ms||bins={n_bins}'
+    run_info = f'||{model_type} with LIF for inhibition layer, sanity check|{dataset}||{time_step}ms||bins={n_bins}'
 
     wandb_run_name = run_name + f'||seed={seed}' + run_info
     wandb_group_name = run_name + run_info

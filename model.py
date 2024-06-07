@@ -25,7 +25,7 @@ class Model(nn.Module):
         self.init_model()
 
         self.init_pos = []
-        if self.config.model_type != 'snn' and self.config.model_type != 'snn_dale':
+        if self.config.model_type != 'snn' and self.config.model_type != 'snn_dale' and self.config.model_type != 'snn_semi_DANN':
             for i in range(len(self.blocks)):
                 self.init_pos.append(np.copy(self.blocks[i][0][0].P.cpu().detach().numpy()))
 
@@ -50,6 +50,13 @@ class Model(nn.Module):
                                                     {'params':self.weights_inh, 'lr':self.config.lr_w, 'weight_decay':self.config.weight_decay},
                                                     {'params':self.weights_plif, 'lr':self.config.lr_w, 'weight_decay':self.config.weight_decay},
                                                     {'params':self.weights_bn, 'lr':self.config.lr_w, 'weight_decay':0}]))
+        if self.config.model_type == 'snn_semi_DANN':
+            if self.config.optimizer_w == 'adam':
+                optimizers_return.append(optim.Adam([{'params':self.weights_exc_exc, 'lr':self.config.lr_w, 'weight_decay':self.config.weight_decay},
+                                                    {'params':self.weights_inh_exc, 'lr':self.config.lr_w, 'weight_decay':self.config.weight_decay},
+                                                    {'params':self.weights_exc_inh, 'lr':self.config.lr_w, 'weight_decay':self.config.weight_decay},
+                                                    {'params':self.weights_plif, 'lr':self.config.lr_w, 'weight_decay':self.config.weight_decay},
+                                                    {'params':self.weights_bn, 'lr':self.config.lr_w, 'weight_decay':0}]))
                     
         elif self.config.model_type == 'ann':
             if self.config.optimizer_w == 'adam':
@@ -67,7 +74,7 @@ class Model(nn.Module):
         ##################################
         schedulers_return = []
 
-        if self.config.model_type in ['snn_delays', 'snn_delays_lr0', 'snn', 'snn_delays_dale', 'snn_dale']:
+        if self.config.model_type in ['snn_delays', 'snn_delays_lr0', 'snn', 'snn_delays_dale', 'snn_dale', 'snn_semi_DANN']:
             if self.config.scheduler_w == 'one_cycle':
                 schedulers_return.append(torch.optim.lr_scheduler.OneCycleLR(optimizers[0], max_lr=self.config.max_lr_w,
                                                                              total_steps=self.config.epochs))
@@ -354,7 +361,7 @@ class Model(nn.Module):
         self.eval()
         with torch.no_grad():
 
-            if self.config.model_type != 'snn' and self.config.model_type != 'snn_dale':
+            if self.config.model_type != 'snn' and self.config.model_type != 'snn_dale' and self.config.model_type != 'snn_semi_DANN':
                 for i in range(len(self.blocks)):
                     self.blocks[i][0][0].SIG *= 0
                     self.blocks[i][0][0].version = 'max'
@@ -379,7 +386,7 @@ class Model(nn.Module):
 
                 self.reset_model(train=False)
 
-            if self.config.DCLSversion == 'gauss' and self.config.model_type != 'snn' and self.config.model_type != 'snn_dale':
+            if self.config.DCLSversion == 'gauss' and self.config.model_type != 'snn' and self.config.model_type != 'snn_dale' and self.config.model_type != 'snn_semi_DANN':
                 for i in range(len(self.blocks)):
                     self.blocks[i][0][0].version = 'gauss'
                     self.blocks[i][0][0].DCK.version = 'gauss'

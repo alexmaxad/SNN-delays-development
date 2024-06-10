@@ -6,11 +6,11 @@ from spikingjelly.spikingjelly.activation_based import neuron, layer
 from spikingjelly.spikingjelly.activation_based import functional
 
 from model import Model
-from DaleLinear import DaleLinear
+from semi_DANNLAyer import semi_DANNLayer
 from utils import set_seed
 
 
-class SNN_Dale(Model):
+class semi_DANN(Model):
     def __init__(self, config):
         super().__init__(config)
 
@@ -28,7 +28,7 @@ class SNN_Dale(Model):
 
         ################################################   First Layer    #######################################################
 
-        self.blocks = [[[DaleLinear(self.config.n_inputs, self.config.n_hidden_neurons, exc_proportion=1, bias=self.config.bias, step_mode='m')],
+        self.blocks = [[[semi_DANNLayer(self.config.n_inputs, self.config.n_hidden_neurons, exc_proportion=self.config.exc_proportion, bias=self.config.bias, step_mode='m', config=self.config)],
                         [layer.Dropout(self.config.dropout_p, step_mode='m')]]]
         
         if self.config.use_batchnorm: self.blocks[0][0].insert(1, layer.BatchNorm1d(self.config.n_hidden_neurons, step_mode='m'))
@@ -51,7 +51,7 @@ class SNN_Dale(Model):
         ################################################   Hidden Layers    #######################################################
 
         for i in range(self.config.n_hidden_layers-1):
-            self.block = [[DaleLinear(self.config.n_hidden_neurons, self.config.n_hidden_neurons, exc_proportion=self.config.exc_proportion, bias = self.config.bias, step_mode='m')],
+            self.block = [[semi_DANNLayer(self.config.n_hidden_neurons, self.config.n_hidden_neurons, exc_proportion=self.config.exc_proportion, bias = self.config.bias, step_mode='m', config=self.config)],
                             [layer.Dropout(self.config.dropout_p, step_mode='m')]]
         
             if self.config.use_batchnorm: self.block[0].insert(1, layer.BatchNorm1d(self.config.n_hidden_neurons, step_mode='m'))
@@ -74,7 +74,7 @@ class SNN_Dale(Model):
         ################################################   Final Layer    #######################################################
 
 
-        self.final_block = [[DaleLinear(self.config.n_hidden_neurons, self.config.n_outputs, exc_proportion=self.config.exc_proportion, bias = self.config.bias, step_mode='m')]]
+        self.final_block = [[semi_DANNLayer(self.config.n_hidden_neurons, self.config.n_outputs, exc_proportion=self.config.exc_proportion, bias = self.config.bias, step_mode='m', config=self.config)]]
         if self.config.spiking_neuron_type == 'lif':
             self.final_block.append([neuron.LIFNode(tau=self.config.init_tau, v_threshold=self.config.output_v_threshold, 
                                                     surrogate_function=self.config.surrogate_function, detach_reset=self.config.detach_reset, 
@@ -93,14 +93,16 @@ class SNN_Dale(Model):
         #print(self.model)
 
         self.positions = []
-        self.weights_exc = []
-        self.weights_inh = []
+        self.weights_exc_exc = []
+        self.weights_inh_exc = []
+        self.weights_exc_inh = []
         self.weights_bn = []
         self.weights_plif = []
         for m in self.model.modules():
-            if isinstance(m, DaleLinear):
-                self.weights_exc.append(m.w_exc)
-                self.weights_inh.append(m.w_inh)
+            if isinstance(m, semi_DANNLayer):
+                self.weights_exc_exc.append(m.w_exc_exc)
+                self.weights_inh_exc.append(m.w_inh_exc)
+                self.weights_exc_exc.append(m.w_exc_inh)
                 if self.config.bias:
                     self.weights_bn.append(m.bias)
             elif isinstance(m, layer.BatchNorm1d):
@@ -121,27 +123,28 @@ class SNN_Dale(Model):
         if self.config.init_w_method == 'kaiming_uniform':
             for i in range(self.config.n_hidden_layers+1):
                 # can you replace with self.weights ?
-                torch.nn.init.kaiming_uniform_(self.blocks[i][0][0].w_exc, nonlinearity='relu')
-                torch.nn.init.kaiming_uniform_(self.blocks[i][0][0].w_inh, nonlinearity='relu')
+                torch.nn.init.kaiming_uniform_(self.blocks[i][0][0].w_exc_exc, nonlinearity='relu')
+                torch.nn.init.kaiming_uniform_(self.blocks[i][0][0].w_inh_exc, nonlinearity='relu')
+                torch.nn.init.kaiming_uniform_(self.blocks[i][0][0].w_exc_inh, nonlinearity='relu')
                 
-                if self.config.sparsity_p > 0:
+                '''if self.config.sparsity_p > 0:
                     with torch.no_grad():
                         self.mask.append(torch.rand(self.blocks[i][0][0].weight.size()).to(self.blocks[i][0][0].weight.device))
                         self.mask[i][self.mask[i]>self.config.sparsity_p]=1
                         self.mask[i][self.mask[i]<=self.config.sparsity_p]=0
                         #self.blocks[i][0][0].weight = torch.nn.Parameter(self.blocks[i][0][0].weight * self.mask[i])
-                        self.blocks[i][0][0].weight *= self.mask[i]
+                        self.blocks[i][0][0].weight *= self.mask[i]'''
 
 
 
     def reset_model(self, train=True):
         functional.reset_net(self)
-        for i in range(self.config.n_hidden_layers+1):                
+        '''for i in range(self.config.n_hidden_layers+1):                
             if self.config.sparsity_p > 0:
                 with torch.no_grad():
                     self.mask[i] = self.mask[i].to(self.blocks[i][0][0].weight.device)
                     #self.blocks[i][0][0].weight = torch.nn.Parameter(self.blocks[i][0][0].weight * self.mask[i])
-                    self.blocks[i][0][0].weight *= self.mask[i]
+                    self.blocks[i][0][0].weight *= self.mask[i]'''
 
 
     def decrease_sig(self, epoch):
@@ -194,13 +197,15 @@ class SNN_Dale(Model):
             else: tau_s = 0
             
             '''w = torch.abs(self.blocks[i][0][0].weight).mean()'''
-            w_m_exc = torch.abs(self.blocks[i][0][0].w_exc).mean()
-            w_m_inh = torch.abs(self.blocks[i][0][0].w_inh).mean()
+            w_m_exc_exc = torch.abs(self.blocks[i][0][0].w_exc_exc).mean()
+            w_m_inh_exc = torch.abs(self.blocks[i][0][0].w_inh_exc).mean()
+            w_m_exc_inh = torch.abs(self.blocks[i][0][0].w_exc_inh).mean()
 
             model_logs.update({f'tau_m_{i}':tau_m*self.config.time_step, 
                                f'tau_s_{i}':tau_s*self.config.time_step,
-                               f'w_exc_{i}':w_m_exc,
-                               f'w_inh_{i}':w_m_inh})
+                               f'w_exc_exc_{i}':w_m_exc_exc,
+                               f'w_inh_exc_{i}':w_m_inh_exc,
+                               f'w_exc_inh_{i}':w_m_exc_inh})
                                #'''f'w_{i}':w}'''
 
         return model_logs

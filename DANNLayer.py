@@ -13,8 +13,8 @@ class DANNLayer(nn.Module):
         self.in_features_inh = in_features - self.in_features_exc
 
         # Initialize parameters
-        self.WEE = nn.Parameter(torch.empty(self.in_features_exc, self.in_features_exc))
-        self.WIE = nn.Parameter(torch.empty(self.in_features_inh, self.in_features_exc))
+        self.WEE = nn.Parameter(torch.empty(out_features, self.in_features_exc))
+        self.WIE = nn.Parameter(torch.empty(out_features, self.in_features_exc))
         self.WEI = nn.Parameter(torch.empty(self.in_features_exc, self.in_features_inh))
         self.alpha = nn.Parameter(torch.empty(self.in_features_inh, 1))
         self.g = nn.Parameter(torch.empty(self.in_features_exc, 1))

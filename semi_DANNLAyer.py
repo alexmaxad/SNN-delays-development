@@ -22,7 +22,7 @@ class semi_DANNLayer(nn.Module, base.StepModule):
 
         if bias:
             self.bias = nn.Parameter(torch.randn(out_features))
-            fan_in, _ = torch.nn.init._calculate_fan_in_and_fan_out(self.weight)
+            fan_in, _ = in_features
             bound = 1 / math.sqrt(fan_in)
             torch.nn.init.uniform_(self.bias, -bound, bound)
         else:
@@ -42,15 +42,14 @@ class semi_DANNLayer(nn.Module, base.StepModule):
 
     def forward(self, x):
 
-        '''in_inhib = F.linear(x, torch.abs(self.w_inh_exc))
+        in_inhib = F.linear(x, torch.abs(self.w_inh_exc))
         in_inhib = self.bn_I(in_inhib)
         in_inhib = self.LIF(in_inhib)
 
-        out_inhib = F.linear(in_inhib, -torch.abs(self.w_exc_inh))'''
+        out_inhib = F.linear(in_inhib, -torch.abs(self.w_exc_inh))
         excit_excit = F.linear(x, torch.abs(self.w_exc_exc))
 
-        '''out = out_inhib + excit_excit'''
-        out = excit_excit
+        out = out_inhib + excit_excit
 
         if self.bias is not None:
             out += self.bias

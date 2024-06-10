@@ -149,7 +149,7 @@ class Config:
     run_name = 'Run test 00'
 
 
-    run_info = f'||{model_type} with LIF for inhibition layer, sanity check|{dataset}||{time_step}ms||bins={n_bins}'
+    run_info = f'||{model_type} sanity check|{dataset}||{time_step}ms||bins={n_bins}'
 
     wandb_run_name = run_name + f'||seed={seed}' + run_info
     wandb_group_name = run_name + run_info

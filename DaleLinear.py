@@ -15,14 +15,17 @@ class DaleLinear(nn.Module, base.StepModule):
         self.w_exc = nn.Parameter(torch.rand(out_features, self.in_features_exc))
         self.w_inh = nn.Parameter(torch.rand(out_features, self.in_features_inh))
 
-        self.weight = torch.cat((self.w_exc, self.w_inh), 1)
-
         if bias == True :
             self.bias = nn.Parameter(torch.rand(out_features))
         else :
             self.bias = nn.Parameter(torch.zeros(out_features))
 
         self.step_mode = step_mode
+
+    @property
+    def weight(self):
+        # Concatenate weights along the second dimension (dim=1)
+        return torch.cat((self.w_exc, self.w_inh), dim=1)
 
     def forward(self, x):
 
@@ -31,7 +34,7 @@ class DaleLinear(nn.Module, base.StepModule):
         out_exc = F.linear(x_exc, torch.abs(self.w_exc))
 
         if self.in_features_inh > 0 :
-            out_inh = F.linear(x_inh, torch.abs(self.w_inh))
+            out_inh = F.linear(x_inh, -torch.abs(self.w_inh))
             out = out_exc + out_inh + self.bias
         else :
             out = out_exc + self.bias

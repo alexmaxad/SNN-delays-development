@@ -14,7 +14,7 @@ class Config:
     seed = 0
 
     # model type could be set to : 'snn_delays' |  'snn_delays_lr0' |  'snn' | 'snn_delays_dale | 'snn_dale' | 'snn_semi_DANN'
-    model_type = 'snn_semi_DANN'          
+    model_type = 'snn_delays_dale'          
     
 
     time_step = 10
@@ -38,7 +38,7 @@ class Config:
     n_hidden_neurons = 256 
     n_outputs = 20 if dataset == 'shd' else 35
 
-    exc_proportion = 0.8
+    exc_proportion = 1
     sparsity_p = 0
 
     dropout_p = 0.4
@@ -149,7 +149,7 @@ class Config:
     run_name = 'Run test 00'
 
 
-    run_info = f'||{model_type}|{dataset}||{time_step}ms||bins={n_bins}'
+    run_info = f'||{model_type} sanity|{dataset}||{time_step}ms||bins={n_bins}'
 
     wandb_run_name = run_name + f'||seed={seed}' + run_info
     wandb_group_name = run_name + run_info

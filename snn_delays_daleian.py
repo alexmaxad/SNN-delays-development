@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from spikingjelly.spikingjelly.activation_based import neuron, layer
 from spikingjelly.spikingjelly.activation_based import functional
 
-from DCLS.construct.modules import Dcls1d
+from DaleDCLSLayer import DCLS_semi_DANNLayer
 
 from model import Model
 from utils import set_seed
@@ -29,9 +29,7 @@ class SnnDelays_Dale(Model):
 
         ################################################   First Layer    #######################################################
 
-        self.blocks = [[[Dcls1d(self.config.n_inputs, self.config.n_hidden_neurons, kernel_count=self.config.kernel_count, groups = 1, 
-                                dilated_kernel_size = self.config.max_delay, bias=self.config.bias, version=self.config.DCLSversion)],
-                       
+        self.blocks = [[[DCLS_semi_DANNLayer(self.config.n_inputs, self.config.n_hidden_neurons, bias=self.config.bias, config=self.config)],
                         [layer.Dropout(self.config.dropout_p, step_mode='m')]]]
         
         if self.config.use_batchnorm: self.blocks[0][0].insert(1, layer.BatchNorm1d(self.config.n_hidden_neurons, step_mode='m'))
@@ -57,10 +55,8 @@ class SnnDelays_Dale(Model):
         ################################################   Hidden Layers    #######################################################
 
         for i in range(self.config.n_hidden_layers-1):
-            self.block = [[Dcls1d(self.config.n_hidden_neurons, self.config.n_hidden_neurons, kernel_count=self.config.kernel_count, groups = 1, 
-                                dilated_kernel_size = self.config.max_delay, bias=self.config.bias, version=self.config.DCLSversion)],
-                       
-                            [layer.Dropout(self.config.dropout_p, step_mode='m')]]
+            self.block = [[DCLS_semi_DANNLayer(self.config.n_hidden_neurons, self.config.n_hidden_neurons, bias=self.config.bias, config=self.config)],
+                        [layer.Dropout(self.config.dropout_p, step_mode='m')]]
         
             if self.config.use_batchnorm: self.block[0].insert(1, layer.BatchNorm1d(self.config.n_hidden_neurons, step_mode='m'))
             if self.config.spiking_neuron_type == 'lif': 
@@ -85,8 +81,7 @@ class SnnDelays_Dale(Model):
         ################################################   Final Layer    #######################################################
 
 
-        self.final_block = [[Dcls1d(self.config.n_hidden_neurons, self.config.n_outputs, kernel_count=self.config.kernel_count, groups = 1, 
-                                     dilated_kernel_size = self.config.max_delay, bias=self.config.bias, version=self.config.DCLSversion)]]
+        self.final_block = [[DCLS_semi_DANNLayer(self.config.n_hidden_neurons, self.config.n_outputs, bias=self.config.bias, config=self.config)]]
         if self.config.spiking_neuron_type == 'lif':
             self.final_block.append([neuron.LIFNode(tau=self.config.init_tau, v_threshold=self.config.output_v_threshold, 
                                                     surrogate_function=self.config.surrogate_function, detach_reset=self.config.detach_reset, 
@@ -104,14 +99,20 @@ class SnnDelays_Dale(Model):
         self.model = nn.Sequential(*self.model)
         #print(self.model)
 
-        self.positions = []
-        self.weights = []
+        self.positions_exc_exc = []
+        self.positions_inh_exc = []
+        self.weights_exc_exc = []
+        self.weights_inh_exc = []
+        self.weights_exc_inh = []
         self.weights_bn = []
         self.weights_plif = []
         for m in self.model.modules():
-            if isinstance(m, Dcls1d):
-                self.positions.append(m.P)
-                self.weights.append(m.weight)
+            if isinstance(m, DCLS_semi_DANNLayer):
+                self.positions_exc_exc.append(m.DCLS_exc.P)
+                self.positions_inh_exc.append(m.DCLS_inh.P)
+                self.weights_exc_exc.append(m.DCLS_exc.weight)
+                self.weights_inh_exc.append(m.DCLS_inh.weight)
+                self.weights_exc_inh.append(m.w_exc_inh)
                 if self.config.bias:
                     self.weights_bn.append(m.bias)
             elif isinstance(m, layer.BatchNorm1d):
@@ -127,60 +128,40 @@ class SnnDelays_Dale(Model):
         set_seed(self.config.seed)
         self.mask = []
 
-        self.excitatory_mask = []
-        self.inhibitory_mask = []
-        
-        #torch.rand(self.config.n_hidden_neurons, self.config.n_hidden_layers) > 0.2
-        #self.inhibitory_mask = ~self.excitatory_mask
-
         if self.config.init_w_method == 'kaiming_uniform':
             for i in range(self.config.n_hidden_layers+1):
-                    
-                layer_weights = self.blocks[i][0][0].weight.clone()
-
                 # can you replace with self.weights ?
-                #torch.nn.init.kaiming_uniform_(self.blocks[i][0][0].weight, nonlinearity='relu')
-
-                size_out, size_in = layer_weights.squeeze().size()
-
-                mask = torch.rand(size_out) > 0.2
-
-                self.excitatory_mask.append(mask)
-                self.inhibitory_mask.append(~mask)
-
-                print(f"la taille size_out est {size_out}, la taille size_in est {size_in}, la taille du mask est {self.excitatory_mask[i].size()}, et taille des poids de la couche est { layer_weights.size()}")
-
-                torch.nn.init.kaiming_uniform_(layer_weights[self.excitatory_mask[i], :], nonlinearity='relu')
-                torch.nn.init.kaiming_uniform_(layer_weights[self.inhibitory_mask[i], :], nonlinearity='relu')
-
-                layer_weights[self.excitatory_mask[i], :] = torch.abs(layer_weights[self.excitatory_mask[i], :])
-                layer_weights[self.inhibitory_mask[i], :] = -torch.abs(layer_weights[self.inhibitory_mask[i], :])
-                    
-                with torch.no_grad():
-                    self.blocks[i][0][0].weight.copy_(layer_weights)
-
-                if self.config.sparsity_p > 0:
+                torch.nn.init.kaiming_uniform_(self.blocks[i][0][0].DCLS_inh.weight, nonlinearity='relu')
+                torch.nn.init.kaiming_uniform_(self.blocks[i][0][0].DCLS_exc.weight, nonlinearity='relu')
+                torch.nn.init.kaiming_uniform_(self.blocks[i][0][0].w_exc_inh, nonlinearity='relu')
+                
+                '''if self.config.sparsity_p > 0:
                     with torch.no_grad():
                         self.mask.append(torch.rand(self.blocks[i][0][0].weight.size()).to(self.blocks[i][0][0].weight.device))
                         self.mask[i][self.mask[i]>self.config.sparsity_p]=1
                         self.mask[i][self.mask[i]<=self.config.sparsity_p]=0
                         #self.blocks[i][0][0].weight = torch.nn.Parameter(self.blocks[i][0][0].weight * self.mask[i])
-                        self.blocks[i][0][0].weight *= self.mask[i]
+                        self.blocks[i][0][0].weight *= self.mask[i]'''
 
 
         if self.config.init_pos_method == 'uniform':
             for i in range(self.config.n_hidden_layers+1):
                 # can you replace with self.positions?
-                torch.nn.init.uniform_(self.blocks[i][0][0].P, a = self.config.init_pos_a, b = self.config.init_pos_b)
-                self.blocks[i][0][0].clamp_parameters()
+                torch.nn.init.uniform_(self.blocks[i][0][0].DCLS_inh.P, a = self.config.init_pos_a, b = self.config.init_pos_b)
+                torch.nn.init.uniform_(self.blocks[i][0][0].DCLS_exc.P, a = self.config.init_pos_a, b = self.config.init_pos_b)
+                self.blocks[i][0][0].DCLS_inh.clamp_parameters()
+                self.blocks[i][0][0].DCLS_exc.clamp_parameters()
 
                 if self.config.model_type == 'snn_delays_lr0':
-                    self.blocks[i][0][0].P.requires_grad = False
+                    self.blocks[i][0][0].DCLS_inh.P.requires_grad = False
+                    self.blocks[i][0][0].DCLS_exc.P.requires_grad = False
 
         for i in range(self.config.n_hidden_layers+1):
             # can you replace with self.positions?
-            torch.nn.init.constant_(self.blocks[i][0][0].SIG, self.config.sigInit)
-            self.blocks[i][0][0].SIG.requires_grad = False
+            torch.nn.init.constant_(self.blocks[i][0][0].DCLS_inh.SIG, self.config.sigInit)
+            torch.nn.init.constant_(self.blocks[i][0][0].DCLS_exc.SIG, self.config.sigInit)
+            self.blocks[i][0][0].DCLS_inh.SIG.requires_grad = False
+            self.blocks[i][0][0].DCLS_exc.SIG.requires_grad = False
 
 
 
@@ -197,19 +178,11 @@ class SnnDelays_Dale(Model):
                     #self.blocks[i][0][0].weight = torch.nn.Parameter(self.blocks[i][0][0].weight * self.mask[i])
                     self.blocks[i][0][0].weight *= self.mask[i]
 
-            with torch.no_grad():
-                layer_weights = self.blocks[i][0][0].weight.clone()
-
-                layer_weights[self.excitatory_mask[i], :] = torch.abs(layer_weights[self.excitatory_mask[i], :])
-                layer_weights[self.inhibitory_mask[i], :] = -torch.abs(layer_weights[self.inhibitory_mask[i], :])
-
-                with torch.no_grad():
-                    self.blocks[i][0][0].weight.copy_(layer_weights)
-
         # We use clamp_parameters of the Dcls1d modules
         if train: 
             for block in self.blocks:
-                block[0][0].clamp_parameters()
+                block[0][0].DCLS_inh.clamp_parameters()
+                block[0][0].DCLS_exc.clamp_parameters()
 
 
 
@@ -221,9 +194,10 @@ class SnnDelays_Dale(Model):
         # Decreasing to 0.23 instead of 0.5
 
         alpha = 0
-        sig = self.blocks[-1][0][0].SIG[0,0,0,0].detach().cpu().item()
+        sigs  = [self.blocks[-1][0][0].DCLS_exc.SIG[0,0,0,0].detach().cpu().item()] #, self.blocks[-1][0][0].DCLS_inh.SIG[0,0,0,0].detach().cpu().item()]
         if self.config.decrease_sig_method == 'exp':
-            if epoch < self.config.final_epoch and sig > 0.23:
+
+            if epoch < self.config.final_epoch and sigs[0] > 0.23:
                 if self.config.DCLSversion == 'max':
                     # You have to change this !!
                     alpha = (1/self.config.sigInit)**(1/(self.config.final_epoch))
@@ -231,9 +205,21 @@ class SnnDelays_Dale(Model):
                     alpha = (0.23/self.config.sigInit)**(1/(self.config.final_epoch))
 
                 for block in self.blocks:
-                    block[0][0].SIG *= alpha
+                    block[0][0].DCLS_exc.SIG *= alpha
                     # No need to clamp after modifying sigma
                     #block[0][0].clamp_parameters()
+
+            '''if epoch < self.config.final_epoch and sigs[1] > 0.23:
+                if self.config.DCLSversion == 'max':
+                    # You have to change this !!
+                    alpha = (1/self.config.sigInit)**(1/(self.config.final_epoch))
+                elif self.config.DCLSversion == 'gauss':
+                    alpha = (0.23/self.config.sigInit)**(1/(self.config.final_epoch))
+
+                for block in self.blocks:
+                    block[0][0].DCLS_inh.SIG *= alpha
+                    # No need to clamp after modifying sigma
+                    #block[0][0].clamp_parameters()'''
 
 
 
@@ -242,6 +228,7 @@ class SnnDelays_Dale(Model):
         
         for block_id in range(self.config.n_hidden_layers):
             # x is permuted: (time, batch, neurons) => (batch, neurons, time)  in order to be processed by the convolution
+
             x = x.permute(1,2,0)
             x = F.pad(x, (self.config.left_padding, self.config.right_padding), 'constant', 0)  # we use padding for the delays kernel
 
@@ -297,25 +284,27 @@ class SnnDelays_Dale(Model):
     def get_model_wandb_logs(self):
 
 
-        sig = self.blocks[-1][0][0].SIG[0,0,0,0].detach().cpu().item()
+        sig_exc = self.blocks[-1][0][0].DCLS_exc.SIG[0,0,0,0].detach().cpu().item()
 
-        model_logs = {"sigma":sig}
+        model_logs = {"sigma":sig_exc}
 
         for i in range(len(self.blocks)):
             
-            if self.config.spiking_neuron_type != 'heaviside':
+            '''if self.config.spiking_neuron_type != 'heaviside':
                 tau_m = self.blocks[i][1][0].tau if self.config.spiking_neuron_type == 'lif' else  1. / self.blocks[i][1][0].w.sigmoid()
             else: tau_m = 0
             
             if self.config.stateful_synapse and i<len(self.blocks)-1:
                 tau_s = self.blocks[i][1][2].tau if not self.config.stateful_synapse_learnable else  1. / self.blocks[i][1][2].w.sigmoid()
-            else: tau_s = 0
+            else: tau_s = 0'''
             
-            w = torch.abs(self.blocks[i][0][0].weight).mean()
+            w_m_exc_exc = torch.abs(self.blocks[i][0][0].DCLS_exc.weight).mean()
+            w_m_inh_exc = torch.abs(self.blocks[i][0][0].DCLS_inh.weight).mean()
+            w_m_exc_inh = torch.abs(self.blocks[i][0][0].w_exc_inh).mean()
 
-            model_logs.update({f'tau_m_{i}':tau_m*self.config.time_step, 
-                               f'tau_s_{i}':tau_s*self.config.time_step, 
-                               f'w_{i}':w})
+            model_logs.update({f'w_exc_exc_{i}':w_m_exc_exc,
+                               f'w_inh_exc_{i}':w_m_inh_exc,
+                               f'w_exc_inh_{i}':w_m_exc_inh})
 
         return model_logs
 
@@ -323,5 +312,7 @@ class SnnDelays_Dale(Model):
     def round_pos(self):
         with torch.no_grad():
             for i in range(len(self.blocks)):
-                self.blocks[i][0][0].P.round_()
-                self.blocks[i][0][0].clamp_parameters()
+                self.blocks[i][0][0].DCLS_inh.P.round_()
+                self.blocks[i][0][0].DCLS_inh.clamp_parameters()
+                self.blocks[i][0][0].DCLS_exc.P.round_()
+                self.blocks[i][0][0].DCLS_exc.clamp_parameters()

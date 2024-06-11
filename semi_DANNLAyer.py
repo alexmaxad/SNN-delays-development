@@ -13,8 +13,8 @@ class semi_DANNLayer(nn.Module, base.StepModule):
 
         self.config = config
 
-        self.in_features_exc = round(in_features * exc_proportion)
-        self.in_features_inh = in_features - self.in_features_exc
+        self.in_features_exc = round(out_features * exc_proportion)
+        self.in_features_inh = out_features - self.in_features_exc
 
         self.w_exc_exc = nn.Parameter(torch.rand(out_features, in_features))
         self.w_inh_exc = nn.Parameter(torch.rand(self.in_features_inh, in_features))

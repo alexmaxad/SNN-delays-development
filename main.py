@@ -21,7 +21,8 @@ if config.model_type == 'snn_dale':
     model = SNN_Dale(config).to(device)
 if config.model_type == 'snn_semi_DANN':
     model = semi_DANN(config).to(device)
-
+if config.model_type == 'snn_delays':
+    model = SnnDelays(config).to(device)
 if config.model_type == 'snn_delays_lr0':
     model.round_pos()
 

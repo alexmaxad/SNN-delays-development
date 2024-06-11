@@ -25,9 +25,14 @@ class Model(nn.Module):
         self.init_model()
 
         self.init_pos = []
-        if self.config.model_type != 'snn' and self.config.model_type != 'snn_dale' and self.config.model_type != 'snn_semi_DANN':
+
+        if self.config.model_type == 'snn_delays':
             for i in range(len(self.blocks)):
                 self.init_pos.append(np.copy(self.blocks[i][0][0].P.cpu().detach().numpy()))
+        if self.config.model_type == 'snn_delays_dale':
+            for i in range(len(self.blocks)):
+                self.init_pos.append([np.copy(self.blocks[i][0][0].DCLS_layers[l].P.cpu().detach().numpy()) for l in range(2)])
+
 
 
     def optimizers(self):
@@ -36,12 +41,12 @@ class Model(nn.Module):
         ##################################
         optimizers_return = []
 
-        if self.config.model_type in ['snn_delays', 'snn_delays_lr0', 'snn', 'snn_delays_dale']:
+        if self.config.model_type in ['snn_delays', 'snn_delays_lr0', 'snn']:
             if self.config.optimizer_w == 'adam':
                 optimizers_return.append(optim.Adam([{'params':self.weights, 'lr':self.config.lr_w, 'weight_decay':self.config.weight_decay},
                                                      {'params':self.weights_plif, 'lr':self.config.lr_w, 'weight_decay':self.config.weight_decay},
                                                      {'params':self.weights_bn, 'lr':self.config.lr_w, 'weight_decay':0}]))
-            if self.config.model_type in ['snn_delays', 'snn_delays_dale']:
+            if self.config.model_type in ['snn_delays']:
                 if self.config.optimizer_pos == 'adam':
                     optimizers_return.append(optim.Adam(self.positions, lr = self.config.lr_pos, weight_decay=0))
         if self.config.model_type == 'snn_dale':
@@ -57,7 +62,17 @@ class Model(nn.Module):
                                                     {'params':self.weights_exc_inh, 'lr':self.config.lr_w, 'weight_decay':self.config.weight_decay},
                                                     {'params':self.weights_plif, 'lr':self.config.lr_w, 'weight_decay':self.config.weight_decay},
                                                     {'params':self.weights_bn, 'lr':self.config.lr_w, 'weight_decay':0}]))
-                    
+        if self.config.model_type == 'snn_delays_dale':
+            if self.config.optimizer_w == 'adam':
+                optimizers_return.append(optim.Adam([{'params':self.weights_exc_exc, 'lr':self.config.lr_w, 'weight_decay':self.config.weight_decay},
+                                                    {'params':self.weights_inh_exc, 'lr':self.config.lr_w, 'weight_decay':self.config.weight_decay},
+                                                    {'params':self.weights_exc_inh, 'lr':self.config.lr_w, 'weight_decay':self.config.weight_decay},
+                                                    {'params':self.weights_plif, 'lr':self.config.lr_w, 'weight_decay':self.config.weight_decay},
+                                                    {'params':self.weights_bn, 'lr':self.config.lr_w, 'weight_decay':0}]))
+            if self.config.optimizer_pos == 'adam':
+                optimizers_return.append(optim.Adam([{'params':self.positions_exc_exc, 'lr':self.config.lr_pos, 'weight_decay':0},
+                                                     {'params':self.positions_inh_exc, 'lr':self.config.lr_pos, 'weight_decay':0}]))
+                
         elif self.config.model_type == 'ann':
             if self.config.optimizer_w == 'adam':
                 optimizers_return.append(optim.Adam(self.model.parameters(), lr = self.config.lr_w, betas=(0.9,0.999)))
@@ -207,7 +222,7 @@ class Model(nn.Module):
         augmentations = Augs(self.config)
 
         ##################################    Train Loop    ##############################
-
+    
 
         loss_epochs = {'train':[], 'valid':[] , 'test':[]}
         metric_epochs = {'train':[], 'valid':[], 'test':[]}
@@ -217,12 +232,14 @@ class Model(nn.Module):
 
         pre_pos_epoch = self.init_pos.copy()
         pre_pos_5epochs = self.init_pos.copy()
+
         batch_count = 0
         for epoch in range(self.config.epochs):
             self.train()
             #last element in the tuple corresponds to the collate_fn return
             loss_batch, metric_batch = [], []
             pre_pos = pre_pos_epoch.copy()
+
             for i, (x, y, _) in enumerate(tqdm(train_loader)):
                 # x for shd and ssc is: (batch, time, neurons)
 
@@ -251,10 +268,20 @@ class Model(nn.Module):
 
                 if self.config.use_wandb and self.config.model_type in ['snn_delays', 'snn_delays_dale']:
                     wandb_pos_log = {}
+                    wandb_pos_log = {}
+
                     for b in range(len(self.blocks)):
-                        curr_pos = self.blocks[b][0][0].P.cpu().detach().numpy()
-                        wandb_pos_log[f'dpos{b}'] = np.abs(curr_pos - pre_pos[b]).mean()
-                        pre_pos[b] = curr_pos.copy()
+
+                        if self.config.model_type == 'snn_delays':
+                            curr_pos = self.blocks[b][0][0].P.cpu().detach().numpy()
+                            wandb_pos_log[f'dpos{b}'] = np.abs(curr_pos - pre_pos[b]).mean()
+                            pre_pos[b] = curr_pos.copy()
+
+                        if self.config.model_type == 'snn_delays_dale':
+                            curr_pos = [self.blocks[b][0][0].DCLS_inh.P.cpu().detach().numpy(), self.blocks[b][0][0].DCLS_exc.P.cpu().detach().numpy()]
+                            means = [np.abs(curr_pos[i] - pre_pos[b][i]).mean() for i in range(2)]
+                            wandb_pos_log[f'dpos_inh{b}'], wandb_pos_log[f'dpos_exc{b}'] = means[0], means[1]
+                            pre_pos[b] = curr_pos.copy()
 
                     wandb_pos_log.update({"batch":batch_count})
                     wandb.log(wandb_pos_log)
@@ -263,14 +290,30 @@ class Model(nn.Module):
 
             if self.config.model_type in ['snn_delays', 'snn_delays_dale']:
                 pos_logs = {}
-                for b in range(len(self.blocks)):
-                    pos_logs[f'dpos{b}_epoch'] = np.abs(pre_pos[b] - pre_pos_epoch[b]).mean()
-                    pre_pos_epoch[b] = pre_pos[b].copy()
 
-                if epoch%5==0 and epoch>0:
+                if self.config.model_type == 'snn_delays':
+
                     for b in range(len(self.blocks)):
-                        pos_logs[f'dpos{b}_5epochs'] = np.abs(pre_pos[b] - pre_pos_5epochs[b]).mean()
-                        pre_pos_5epochs[b] = pre_pos[b].copy()
+                        pos_logs[f'dpos{b}_epoch'] = np.abs(pre_pos[b] - pre_pos_epoch[b]).mean()
+                        pre_pos_epoch[b] = pre_pos[b].copy()
+
+                    if epoch%5==0 and epoch>0:
+                        for b in range(len(self.blocks)):
+                            pos_logs[f'dpos{b}_5epochs'] = np.abs(pre_pos[b] - pre_pos_5epochs[b]).mean()
+                            pre_pos_5epochs[b] = pre_pos[b].copy()
+
+                if self.config.model_type == 'snn_delays_dale':
+
+                    for b in range(len(self.blocks)):
+                        means = [np.abs(pre_pos[b][i] - pre_pos_epoch[b][i]).mean() for i in range(2)]
+                        pos_logs[f'dpos_inh{b}_epoch'], pos_logs[f'dpos_exc{b}_epoch'] = means[0], means[1]
+                        pre_pos_epoch[b] = pre_pos[b].copy()
+
+                    if epoch%5==0 and epoch>0:
+                        for b in range(len(self.blocks)):
+                            means = [np.abs(pre_pos[b][i] - pre_pos_5epochs[b][i]).mean() for i in range(2)]
+                            pos_logs[f'dpos_inh{b}_5epochs'], pos_logs[f'dpos_exc{b}_5epochs'] = means[0], means[1]
+                            pre_pos_5epochs[b] = pre_pos[b].copy()
 
 
             loss_epochs['train'].append(np.mean(loss_batch))
@@ -363,9 +406,18 @@ class Model(nn.Module):
 
             if self.config.model_type != 'snn' and self.config.model_type != 'snn_dale' and self.config.model_type != 'snn_semi_DANN':
                 for i in range(len(self.blocks)):
-                    self.blocks[i][0][0].SIG *= 0
-                    self.blocks[i][0][0].version = 'max'
-                    self.blocks[i][0][0].DCK.version = 'max'
+
+                    if self.config.model_type == 'snn_delays':
+                        self.blocks[i][0][0].SIG *= 0
+                        self.blocks[i][0][0].version = 'max'
+                        self.blocks[i][0][0].DCK.version = 'max'
+
+                    if self.config.model_type == 'snn_delays_dale':
+                        for l in range(2):
+                            self.blocks[i][0][0].DCLS_layers[l].SIG *= 0
+                            self.blocks[i][0][0].DCLS_layers[l].version = 'max'
+                            self.blocks[i][0][0].DCLS_layers[l].DCK.version = 'max'
+
                 self.round_pos()
 
             loss_batch, metric_batch = [], []
@@ -388,8 +440,15 @@ class Model(nn.Module):
 
             if self.config.DCLSversion == 'gauss' and self.config.model_type != 'snn' and self.config.model_type != 'snn_dale' and self.config.model_type != 'snn_semi_DANN':
                 for i in range(len(self.blocks)):
-                    self.blocks[i][0][0].version = 'gauss'
-                    self.blocks[i][0][0].DCK.version = 'gauss'
+
+                    if self.config.model_type == 'snn_delays':
+                        self.blocks[i][0][0].version = 'gauss'
+                        self.blocks[i][0][0].DCK.version = 'gauss'
+
+                    if self.config.model_type == 'snn_delays_dale':
+                        for l in range(2):
+                            self.blocks[i][0][0].DCLS_layers[l].version = 'gauss'
+                            self.blocks[i][0][0].DCLS_layers[l].DCK.version = 'gauss'
 
             self.load_state_dict(torch.load(eventid + '.pt'), strict=True)
             if os.path.exists(eventid + '.pt'):

@@ -80,10 +80,17 @@ class DCLS_semi_DANNLayer(nn.Module):
 
         self.DCLS_layers = [self.DCLS_inh, self.DCLS_exc]
 
-    '''@property
-    def weight(self):
-        # Concatenate weights along the second dimension (dim=1)
-        return torch.cat((self.w_exc, self.w_inh), dim=1)'''
+        '''# Adding a DCLS after intermediate inhibitory layer to try :
+        self.DCLS_inter = DaleDcls1d_negative(
+            in_channels=self.n_inputs_inh,
+            out_channels=self.n_outputs,
+            kernel_count=self.config.kernel_count,
+            groups=1,
+            dilated_kernel_size = self.config.max_delay,
+            bias=self.config.bias, 
+            version=self.config.DCLSversion,
+        )
+'''
 
     def forward(self, x):
 
@@ -97,15 +104,24 @@ class DCLS_semi_DANNLayer(nn.Module):
             in_inhib = self.bn_I(in_inhib)
             in_inhib = self.LIF(in_inhib)
         
-            #print(f'in_inihib = {in_inhib.size()}, {self.bn_I}')
             #print(f'w_exc_inh = {self.w_exc_inh.size()}')
 
             out_inhib = F.linear(in_inhib, -torch.abs(self.w_exc_inh))
             out_inhib = out_inhib.permute(1,2,0) # (batch, neurons, time)
 
+            # Trying DCLS after intermediate layer :
+            #in_inhib = in_inhib.permute(1,2,0) # (batch, neurons, time)
+            #in_inhib = F.pad(in_inhib, (self.config.left_padding, 0), 'constant', 0)
+
+            #print(f'in_inihib after padding = {in_inhib.size()}') #, {self.bn_I}')
+
+            #out_inhib = self.DCLS_inter(in_inhib)
+
         #print(f'out_inhib = {out_inhib.size()}')
 
         excit_excit = self.DCLS_exc(x)
+
+        #print(f'excit_excit = {excit_excit.size()}')
 
         out = excit_excit + out_inhib
 

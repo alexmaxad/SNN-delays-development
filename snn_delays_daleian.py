@@ -107,6 +107,11 @@ class SnnDelays_Dale(Model):
         self.weights_bn = []
         self.weights_plif = []
 
+        # Trying intermediate DCLS :
+        #self.positions_inter = []
+        #self.weights_inter = []
+
+
         for m in self.model.modules():
             if isinstance(m, DCLS_semi_DANNLayer):
                 self.positions_exc_exc.append(m.DCLS_exc.P)
@@ -114,6 +119,11 @@ class SnnDelays_Dale(Model):
                 self.weights_exc_exc.append(m.DCLS_exc.weight)
                 self.weights_inh_exc.append(m.DCLS_inh.weight)
                 self.weights_exc_inh.append(m.w_exc_inh)
+
+                # Trying intermediate DCLS :
+                #self.positions_inter.append(m.DCLS_inter.P)
+                #self.weights_inter.append(m.DCLS_inter.weight)
+
                 if self.config.bias:
                     self.weights_bn.append(m.bias)
             elif isinstance(m, layer.BatchNorm1d):
@@ -135,6 +145,9 @@ class SnnDelays_Dale(Model):
                 torch.nn.init.kaiming_uniform_(self.blocks[i][0][0].DCLS_inh.weight, nonlinearity='relu')
                 torch.nn.init.kaiming_uniform_(self.blocks[i][0][0].DCLS_exc.weight, nonlinearity='relu')
                 torch.nn.init.kaiming_uniform_(self.blocks[i][0][0].w_exc_inh, nonlinearity='relu')
+
+                # Intermediate DCLS :
+                #torch.nn.init.kaiming_uniform_(self.blocks[i][0][0].DCLS_inter.weight, nonlinearity='relu')
                 
                 '''if self.config.sparsity_p > 0:
                     with torch.no_grad():
@@ -153,6 +166,10 @@ class SnnDelays_Dale(Model):
                 self.blocks[i][0][0].DCLS_inh.clamp_parameters()
                 self.blocks[i][0][0].DCLS_exc.clamp_parameters()
 
+                # Intermediate DCLS :
+                #torch.nn.init.uniform_(self.blocks[i][0][0].DCLS_inter.P, a = self.config.init_pos_a, b = self.config.init_pos_b)
+                #self.blocks[i][0][0].DCLS_inter.clamp_parameters()
+
                 if self.config.model_type == 'snn_delays_lr0':
                     self.blocks[i][0][0].DCLS_inh.P.requires_grad = False
                     self.blocks[i][0][0].DCLS_exc.P.requires_grad = False
@@ -163,6 +180,10 @@ class SnnDelays_Dale(Model):
             torch.nn.init.constant_(self.blocks[i][0][0].DCLS_exc.SIG, self.config.sigInit)
             self.blocks[i][0][0].DCLS_inh.SIG.requires_grad = False
             self.blocks[i][0][0].DCLS_exc.SIG.requires_grad = False
+
+            # Intermediate DCLS :
+            #torch.nn.init.constant_(self.blocks[i][0][0].DCLS_inter.SIG, self.config.sigInit)
+            #self.blocks[i][0][0].DCLS_inter.SIG.requires_grad = False
 
 
 
@@ -182,6 +203,9 @@ class SnnDelays_Dale(Model):
                 block[0][0].DCLS_inh.clamp_parameters()
                 block[0][0].DCLS_exc.clamp_parameters()
 
+                # Intermediate DCLS 
+                #block[0][0].DCLS_inter.clamp_parameters()
+
 
 
 
@@ -190,7 +214,7 @@ class SnnDelays_Dale(Model):
         # Decreasing to 0.23 instead of 0.5
 
         alpha = 0
-        sigs  = [self.blocks[-1][0][0].DCLS_exc.SIG[0,0,0,0].detach().cpu().item(), self.blocks[-1][0][0].DCLS_inh.SIG[0,0,0,0].detach().cpu().item()]
+        sigs  = [self.blocks[-1][0][0].DCLS_exc.SIG[0,0,0,0].detach().cpu().item(), self.blocks[-1][0][0].DCLS_inh.SIG[0,0,0,0].detach().cpu().item()] #, self.blocks[-1][0][0].DCLS_inter.SIG[0,0,0,0].detach().cpu().item()]
         if self.config.decrease_sig_method == 'exp':
 
             if epoch < self.config.final_epoch and sigs[0] > 0.23:
@@ -216,6 +240,20 @@ class SnnDelays_Dale(Model):
                     block[0][0].DCLS_inh.SIG *= alpha
                     # No need to clamp after modifying sigma
                     #block[0][0].clamp_parameters()
+
+            '''# Intermediate DCLS :
+            if epoch < self.config.final_epoch and sigs[2] > 0.23:
+                if self.config.DCLSversion == 'max':
+                    # You have to change this !!
+                    alpha = (1/self.config.sigInit)**(1/(self.config.final_epoch))
+                elif self.config.DCLSversion == 'gauss':
+                    alpha = (0.23/self.config.sigInit)**(1/(self.config.final_epoch))
+
+                for block in self.blocks:
+                    block[0][0].DCLS_inter.SIG *= alpha
+                    # No need to clamp after modifying sigma
+                    #block[0][0].clamp_parameters()'''
+
 
 
 
@@ -317,3 +355,8 @@ class SnnDelays_Dale(Model):
                 self.blocks[i][0][0].DCLS_inh.clamp_parameters()
                 self.blocks[i][0][0].DCLS_exc.P.round_()
                 self.blocks[i][0][0].DCLS_exc.clamp_parameters()
+
+                # Intermediate DCLS :
+                #self.blocks[i][0][0].DCLS_inter.P.round_()
+                #self.blocks[i][0][0].DCLS_inter.clamp_parameters()
+

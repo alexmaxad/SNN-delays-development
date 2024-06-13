@@ -392,7 +392,7 @@ class Model(nn.Module):
 
         if self.config.use_wandb:
 
-            if self.config.model_type == 'snn_delays_dale':
+            if self.config.model_type in ['snn_delays', 'snn_delays_dale']:
 
                     final_pos_logs = {}
                     
@@ -441,6 +441,11 @@ class Model(nn.Module):
                             self.blocks[i][0][0].DCLS_layers[l].version = 'max'
                             self.blocks[i][0][0].DCLS_layers[l].DCK.version = 'max'
 
+                        # Intermediate DCLS :
+                        #self.blocks[i][0][0].DCLS_inter.SIG *= 0
+                        #self.blocks[i][0][0].DCLS_inter.version = 'max'
+                        #self.blocks[i][0][0].DCLS_inter.DCK.version = 'max'
+
                 self.round_pos()
 
             loss_batch, metric_batch = [], []
@@ -472,6 +477,10 @@ class Model(nn.Module):
                         for l in range(2):
                             self.blocks[i][0][0].DCLS_layers[l].version = 'gauss'
                             self.blocks[i][0][0].DCLS_layers[l].DCK.version = 'gauss'
+
+                        # Intermediate DCLS :
+                        #self.blocks[i][0][0].DCLS_inter.version = 'max'
+                        #self.blocks[i][0][0].DCLS_inter.DCK.version = 'max'
 
             self.load_state_dict(torch.load(eventid + '.pt'), strict=True)
             if os.path.exists(eventid + '.pt'):

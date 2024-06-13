@@ -38,7 +38,7 @@ class Config:
     n_hidden_neurons = 256 
     n_outputs = 20 if dataset == 'shd' else 35
 
-    exc_proportion = 1
+    inh_proportion = 0.25
     sparsity_p = 0
 
     dropout_p = 0.4
@@ -67,14 +67,14 @@ class Config:
     weight_decay = 1e-4
 
     lr_w = 1e-3
-    lr_pos = 100*lr_w   if model_type =='snn_delays' else 0
+    lr_pos = 100*lr_w   if model_type in ['snn_delays', 'snn_delays_dale'] else 0
 
     '''lr_w_exc = 1e-3
     lr_w_inh = 1e-2'''
     
     # 'one_cycle', 'cosine_a', 'none'
     scheduler_w = 'one_cycle'    
-    scheduler_pos = 'cosine_a'   if model_type =='snn_delays' else 'none'
+    scheduler_pos = 'cosine_a'   if model_type in ['snn_delays', 'snn_delays_dale'] else 'none'
 
 
     # for one cycle
@@ -89,7 +89,7 @@ class Config:
     ################################################
     #                    Delays                    #
     ################################################
-    DCLSversion = 'gauss' if model_type =='snn_delays' else 'max'
+    DCLSversion = 'gauss' if model_type in ['snn_delays', 'snn_delays_dale'] else 'max'
     decrease_sig_method = 'exp'
     kernel_count = 1
 
@@ -97,8 +97,8 @@ class Config:
     max_delay = max_delay if max_delay%2==1 else max_delay+1 # to make kernel_size an odd number
     
     # For constant sigma without the decreasing policy, set model_type == 'snn_delays' and sigInit = 0.23 and final_epoch = 0
-    sigInit = max_delay // 2        if model_type == 'snn_delays' else 0
-    final_epoch = (1*epochs)//4     if model_type == 'snn_delays' else 0
+    sigInit = max_delay // 2        if model_type in ['snn_delays', 'snn_delays_dale'] else 0
+    final_epoch = (1*epochs)//4     if model_type in ['snn_delays', 'snn_delays_dale'] else 0
 
 
     left_padding = max_delay-1
@@ -149,7 +149,7 @@ class Config:
     run_name = 'Run test 00'
 
 
-    run_info = f'||{model_type} sanity|{dataset}||{time_step}ms||bins={n_bins}'
+    run_info = f'||{model_type}|{dataset}||{time_step}ms||bins={n_bins}'
 
     wandb_run_name = run_name + f'||seed={seed}' + run_info
     wandb_group_name = run_name + run_info

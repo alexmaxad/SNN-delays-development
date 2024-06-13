@@ -7,11 +7,10 @@ from spikingjelly.spikingjelly.activation_based import base
 
 class DaleLinear(nn.Module, base.StepModule):
 
-    def __init__(self, in_features, out_features, exc_proportion, bias, step_mode):
+    def __init__(self, in_features, out_features, inh_proportion, bias, step_mode):
         super().__init__()
 
-        self.in_features_exc = round(in_features * exc_proportion)
-        self.in_features_inh = in_features - self.in_features_exc
+        self.in_features_inh = round(in_features * inh_proportion)
 
         self.w_exc = nn.Parameter(torch.rand(out_features, self.in_features_exc))
         self.w_inh = nn.Parameter(torch.rand(out_features, self.in_features_inh))

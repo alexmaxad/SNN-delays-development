@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
+import wandb.plot
 
 from config import Config
 from utils import set_seed
@@ -11,6 +12,7 @@ from datasets import Augs
 from tqdm import tqdm
 from datetime import datetime
 from uuid import uuid4
+from collections import Counter
 import os
 
 eventid = datetime.now().strftime('%Y%m-%d%H-%M%S-') + str(uuid4())
@@ -372,9 +374,6 @@ class Model(nn.Module):
 
                 wandb_logs.update(model_logs)
 
-                if self.config.model_type in ['snn_delays', 'snn_delays_dale']:
-                    wandb_logs.update(pos_logs)
-
                 wandb.log(wandb_logs)
 
 
@@ -391,8 +390,32 @@ class Model(nn.Module):
             if  metric_test > best_metric_test:#  and (self.config.model_type != 'snn_delays' or epoch >= self.config.final_epoch - 1):
                 best_metric_test = metric_test
 
-
         if self.config.use_wandb:
+
+            if self.config.model_type == 'snn_delays_dale':
+
+                    final_pos_logs = {}
+                    
+                    for b in range(len(self.blocks)) :
+                        self.round_pos()
+                        final_positions = [self.blocks[b][0][0].DCLS_inh.P.cpu().detach().view(-1).numpy(), self.blocks[b][0][0].DCLS_exc.P.cpu().detach().view(-1).numpy()]
+
+                        histogram_tables = []
+                        for i in range(2):
+                            value_counts = Counter(final_positions[i])
+                            x_values = list(value_counts.keys())
+                            y_counts = list(value_counts.values())
+
+                            histogram_table = wandb.Table(columns=["Value", "Count"])
+                            for x, y in zip(x_values, y_counts):
+                                histogram_table.add_data(x, y)
+                            
+                            histogram_tables.append(histogram_table)
+
+                        final_pos_logs[f'final delay positions block {b} inh'], final_pos_logs[f'final delay positions block {b} exc'] = wandb.plot.bar(histogram_tables[0], "Value", "Count", title=f"Count of final positions of delays after training | inh | block {b}"), wandb.plot.bar(histogram_tables[1], "Value", "Count", title=f"Count of final positions of delays after training | exc | block {b}")
+
+                    wandb.log(final_pos_logs)
+
             wandb.run.finish()
 
 

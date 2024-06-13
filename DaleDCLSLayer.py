@@ -15,7 +15,7 @@ class DaleDcls1d_positive(Dcls1d):
         super().__init__(*args, **kwargs)
 
     def forward(self, input):
-        return self._conv_forward(input, self.weight, self.bias, self.P, self.SIG)
+        return self._conv_forward(input, torch.abs(self.weight), self.bias, self.P, self.SIG)
 
 class DaleDcls1d_negative(Dcls1d):
     def __init__(self, *args, **kwargs):
@@ -41,8 +41,7 @@ class DCLS_semi_DANNLayer(nn.Module):
 
         self.n_inputs = n_inputs
         self.n_outputs = n_outputs
-        self.n_inputs_exc = round(n_outputs * self.config.exc_proportion)
-        self.n_inputs_inh = n_outputs - self.n_inputs_exc
+        self.n_inputs_inh = round(n_outputs * self.config.inh_proportion)
 
         self.w_exc_inh = nn.Parameter(torch.rand(self.n_outputs, self.n_inputs_inh))
 
@@ -88,24 +87,27 @@ class DCLS_semi_DANNLayer(nn.Module):
 
     def forward(self, x):
 
+        # x is of size (batch, neurons, time)
+
+        #print(f'x_size = {x.size()}')
+
         if self.n_inputs_inh > 0:
-            #print(f'x_size = {x.size()}')
             in_inhib = self.DCLS_inh(x)
-            in_inhib = in_inhib.permute(2,0,1)
+            in_inhib = in_inhib.permute(2,0,1) # (time, batch, neurons)
             in_inhib = self.bn_I(in_inhib)
             in_inhib = self.LIF(in_inhib)
+        
             #print(f'in_inihib = {in_inhib.size()}, {self.bn_I}')
-
             #print(f'w_exc_inh = {self.w_exc_inh.size()}')
 
             out_inhib = F.linear(in_inhib, -torch.abs(self.w_exc_inh))
-            out_inhib = out_inhib.permute(1,2,0)
+            out_inhib = out_inhib.permute(1,2,0) # (batch, neurons, time)
 
         #print(f'out_inhib = {out_inhib.size()}')
 
         excit_excit = self.DCLS_exc(x)
 
-        out = excit_excit #+ out_inhib
+        out = excit_excit + out_inhib
 
         #print(f'out = {out.size()}')
 

@@ -28,7 +28,7 @@ class SNN_Dale(Model):
 
         ################################################   First Layer    #######################################################
 
-        self.blocks = [[[DaleLinear(self.config.n_inputs, self.config.n_hidden_neurons, exc_proportion=1, bias=self.config.bias, step_mode='m')],
+        self.blocks = [[[DaleLinear(self.config.n_inputs, self.config.n_hidden_neurons, inh_proportion=0, bias=self.config.bias, step_mode='m')],
                         [layer.Dropout(self.config.dropout_p, step_mode='m')]]]
         
         if self.config.use_batchnorm: self.blocks[0][0].insert(1, layer.BatchNorm1d(self.config.n_hidden_neurons, step_mode='m'))
@@ -51,7 +51,7 @@ class SNN_Dale(Model):
         ################################################   Hidden Layers    #######################################################
 
         for i in range(self.config.n_hidden_layers-1):
-            self.block = [[DaleLinear(self.config.n_hidden_neurons, self.config.n_hidden_neurons, exc_proportion=self.config.exc_proportion, bias = self.config.bias, step_mode='m')],
+            self.block = [[DaleLinear(self.config.n_hidden_neurons, self.config.n_hidden_neurons, exc_proportion=self.config.inh_proportion, bias = self.config.bias, step_mode='m')],
                             [layer.Dropout(self.config.dropout_p, step_mode='m')]]
         
             if self.config.use_batchnorm: self.block[0].insert(1, layer.BatchNorm1d(self.config.n_hidden_neurons, step_mode='m'))
@@ -74,7 +74,7 @@ class SNN_Dale(Model):
         ################################################   Final Layer    #######################################################
 
 
-        self.final_block = [[DaleLinear(self.config.n_hidden_neurons, self.config.n_outputs, exc_proportion=self.config.exc_proportion, bias = self.config.bias, step_mode='m')]]
+        self.final_block = [[DaleLinear(self.config.n_hidden_neurons, self.config.n_outputs, exc_proportion=self.config.inh_proportion, bias = self.config.bias, step_mode='m')]]
         if self.config.spiking_neuron_type == 'lif':
             self.final_block.append([neuron.LIFNode(tau=self.config.init_tau, v_threshold=self.config.output_v_threshold, 
                                                     surrogate_function=self.config.surrogate_function, detach_reset=self.config.detach_reset, 

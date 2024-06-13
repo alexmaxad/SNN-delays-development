@@ -106,6 +106,7 @@ class SnnDelays_Dale(Model):
         self.weights_exc_inh = []
         self.weights_bn = []
         self.weights_plif = []
+
         for m in self.model.modules():
             if isinstance(m, DCLS_semi_DANNLayer):
                 self.positions_exc_exc.append(m.DCLS_exc.P)
@@ -165,18 +166,15 @@ class SnnDelays_Dale(Model):
 
 
 
-
-
-
     def reset_model(self, train=True):
         functional.reset_net(self)
 
-        for i in range(self.config.n_hidden_layers+1):                
+        '''for i in range(self.config.n_hidden_layers+1):                
             if self.config.sparsity_p > 0:
                 with torch.no_grad():
                     self.mask[i] = self.mask[i].to(self.blocks[i][0][0].weight.device)
                     #self.blocks[i][0][0].weight = torch.nn.Parameter(self.blocks[i][0][0].weight * self.mask[i])
-                    self.blocks[i][0][0].weight *= self.mask[i]
+                    self.blocks[i][0][0].weight *= self.mask[i]'''
 
         # We use clamp_parameters of the Dcls1d modules
         if train: 
@@ -187,14 +185,12 @@ class SnnDelays_Dale(Model):
 
 
 
-
-
     def decrease_sig(self, epoch):
 
         # Decreasing to 0.23 instead of 0.5
 
         alpha = 0
-        sigs  = [self.blocks[-1][0][0].DCLS_exc.SIG[0,0,0,0].detach().cpu().item()] #, self.blocks[-1][0][0].DCLS_inh.SIG[0,0,0,0].detach().cpu().item()]
+        sigs  = [self.blocks[-1][0][0].DCLS_exc.SIG[0,0,0,0].detach().cpu().item(), self.blocks[-1][0][0].DCLS_inh.SIG[0,0,0,0].detach().cpu().item()]
         if self.config.decrease_sig_method == 'exp':
 
             if epoch < self.config.final_epoch and sigs[0] > 0.23:
@@ -209,7 +205,7 @@ class SnnDelays_Dale(Model):
                     # No need to clamp after modifying sigma
                     #block[0][0].clamp_parameters()
 
-            '''if epoch < self.config.final_epoch and sigs[1] > 0.23:
+            if epoch < self.config.final_epoch and sigs[1] > 0.23:
                 if self.config.DCLSversion == 'max':
                     # You have to change this !!
                     alpha = (1/self.config.sigInit)**(1/(self.config.final_epoch))
@@ -219,7 +215,7 @@ class SnnDelays_Dale(Model):
                 for block in self.blocks:
                     block[0][0].DCLS_inh.SIG *= alpha
                     # No need to clamp after modifying sigma
-                    #block[0][0].clamp_parameters()'''
+                    #block[0][0].clamp_parameters()
 
 
 
@@ -230,10 +226,12 @@ class SnnDelays_Dale(Model):
             # x is permuted: (time, batch, neurons) => (batch, neurons, time)  in order to be processed by the convolution
 
             x = x.permute(1,2,0)
+            #print(f'x size after first permutation = {x.size()}')
             x = F.pad(x, (self.config.left_padding, self.config.right_padding), 'constant', 0)  # we use padding for the delays kernel
 
             # we use convolution of delay kernels
             x = self.blocks[block_id][0][0](x)
+            #print(f'x size after conv block = {x.size()}')
 
             # We permute again: (batch, neurons, time) => (time, batch, neurons) in order to be processed by batchnorm or Lif
             x = x.permute(2,0,1)
@@ -243,7 +241,7 @@ class SnnDelays_Dale(Model):
                 # we do batch norm on the channels since length is the time dimension
                 # we use squeeze to get rid of the channels dimension 
                 x = self.blocks[block_id][0][1](x.unsqueeze(3)).squeeze()
-            
+                #print(f'x size after bn = {x.size()}')
             
             # we use our spiking neuron filter
             if self.config.spiking_neuron_type != 'heaviside':
@@ -254,6 +252,7 @@ class SnnDelays_Dale(Model):
 
 
             x = self.blocks[block_id][1][1](spikes)
+            #print(f'x size after spikes = {x.size()}')
 
             # we apply synapse filter
             if self.config.stateful_synapse:
@@ -276,6 +275,8 @@ class SnnDelays_Dale(Model):
 
             if self.config.loss != 'spike_count':
                 out = self.blocks[-1][1][0].v_seq
+        
+        #print(f'out size after spikes = {out.size()}')
 
         return out#, self.blocks[0][1][0].v_seq
     

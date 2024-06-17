@@ -6,7 +6,7 @@ from spikingjelly.spikingjelly.activation_based import neuron, layer
 from spikingjelly.spikingjelly.activation_based import functional
 
 from model import Model
-from semi_DANNLAyer import semi_DANNLayer
+from layers.semi_DANNLAyer import semi_DANNLayer
 from utils import set_seed
 
 

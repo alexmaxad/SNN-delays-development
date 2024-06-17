@@ -6,7 +6,7 @@ from spikingjelly.spikingjelly.activation_based import neuron, layer
 from spikingjelly.spikingjelly.activation_based import functional
 
 from model import Model
-from DaleLinear import DaleLinear
+from layers.DaleLinear import DaleLinear
 from utils import set_seed
 
 

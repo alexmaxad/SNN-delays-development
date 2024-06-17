@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from spikingjelly.spikingjelly.activation_based import neuron, layer
 from spikingjelly.spikingjelly.activation_based import functional
 
-from DaleDCLSLayer import DCLS_semi_DANNLayer
+from layers.DaleDCLSLayer import DCLS_semi_DANNLayer
 
 from model import Model
 from utils import set_seed

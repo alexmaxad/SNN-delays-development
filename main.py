@@ -1,11 +1,11 @@
 from datasets import SHD_dataloaders, SSC_dataloaders, GSC_dataloaders
 from config import Config
-from snn_delays import SnnDelays
-from snn_delays_daleian import SnnDelays_Dale
-from snn_daleian import SNN_Dale
-from snn_semi_DANN import semi_DANN
+from networks.snn_delays import SnnDelays
+from networks.snn_delays_daleian import SnnDelays_Dale
+from networks.snn_daleian import SNN_Dale
+from networks.snn_semi_DANN import semi_DANN
 import torch
-from snn import SNN
+from networks.snn import SNN
 import utils
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
